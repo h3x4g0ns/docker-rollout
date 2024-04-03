@@ -193,7 +193,7 @@ while [ $# -gt 0 ]; do
     WAIT_AFTER_HEALTHY_DELAY="$2"
     shift 2
     ;;
-  -p | --profile)
+  --profile)
     PROFILE="$2"
     shift 2
     ;;
