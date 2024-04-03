@@ -5,6 +5,8 @@ set -e
 HEALTHCHECK_TIMEOUT=60
 NO_HEALTHCHECK_TIMEOUT=10
 WAIT_AFTER_HEALTHY_DELAY=0
+PROFILE=""
+
 
 # Print metadata for Docker CLI plugin
 if [ "$1" = "docker-cli-plugin-metadata" ]; then
@@ -12,7 +14,7 @@ if [ "$1" = "docker-cli-plugin-metadata" ]; then
 {
   "SchemaVersion": "0.1.0",
   "Vendor": "Karol Musur",
-  "Version": "v0.9",
+  "Version": "v0.10",
   "ShortDescription": "Rollout new Compose service version"
 }
 EOF
@@ -57,6 +59,8 @@ Options:
       --wait-after-healthy N  When healthcheck is defined and succeeds, wait for additional N seconds
                               before stopping the old container (default: 0 seconds)
       --env-file FILE         Specify an alternate environment file
+      --profile PROFILE       Specify a profile for the docker-compose file
+
 
 EOF
 }
@@ -72,15 +76,28 @@ healthcheck() {
 }
 
 scale() {
-  # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach --scale "$1=$2" --no-recreate "$1"
+  # Add support for profile if specified
+  if [ -n "$PROFILE" ]; then
+    PROFILE_ARG="--profile $PROFILE"
+  else
+    PROFILE_ARG=""
+  fi
+  # Use PROFILE_ARG when calling docker compose up
+  $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES $PROFILE_ARG up --detach --scale "$1=$2" --no-recreate "$1"
 }
 
 main() {
+  # Similar to scale, add support for profile in main function
+  if [ -n "$PROFILE" ]; then
+    PROFILE_ARG="--profile $PROFILE"
+  else
+    PROFILE_ARG=""
+  fi
+  
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   if [ -z "$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE")" ]; then
     echo "==> Service '$SERVICE' is not running. Starting the service."
-    $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach --no-recreate "$SERVICE"
+    $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES $PROFILE_ARG up --detach --no-recreate "$SERVICE"
     exit 0
   fi
 
@@ -174,6 +191,10 @@ while [ $# -gt 0 ]; do
     ;;
   --wait-after-healthy)
     WAIT_AFTER_HEALTHY_DELAY="$2"
+    shift 2
+    ;;
+  -p | --profile)
+    PROFILE="$2"
     shift 2
     ;;
   -*)
